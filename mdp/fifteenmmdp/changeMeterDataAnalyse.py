@@ -10,6 +10,27 @@ from pathlib import Path
 from .models import *
 import json
 
+
+
+
+# Added for Absolute Calculation
+def getCorrespondingClosingIdx(tokens, t):
+#     print(tokens)
+    count = 1
+    
+    for token in tokens:
+        if(token == '('):
+            count = count + 1
+        elif(token == ')'):
+            count = count - 1
+            if(count == 0): return t
+        else:
+            pass
+    
+        t = t + 1
+    
+    return t
+
 def headerForMWHData(headerData):
     actDiff = f'{float(headerData[3]) :.4f}'
 
@@ -223,6 +244,32 @@ def changeMeterEndDataWithEquation(path,startDate,endDate,meterEndToReplace,equa
         return "Loc_Id not found"
 
     ################################################ Evaluate Function ###########################################################################
+    def takeAbsolute(_fictMeterId,_mwhDate,valueToAppend) :
+        print(type(valueToAppend))
+        if(isinstance(valueToAppend, pd.core.series.Series)):
+            print("Reached at takeAbsolute if. Need to take absolute of Series data")
+
+            returnSeries = pd.Series([],dtype=object)
+            seriesHeader = [_fictMeterId, 'ZZZ-ZZZ-ZZZ',_mwhDate] +  [str(e) for e in list(map(lambda x: abs(float(x)), valueToAppend[0].split()[3:]))]
+            returnSeries = returnSeries.append(pd.Series(" ".join(seriesHeader)), ignore_index=True)
+
+            i = 1
+            while i < 25 :
+                seriesBody = [valueToAppend[i].split()[0]] +  [str(e) for e in list(map(lambda x: abs(float(x)), valueToAppend[i].split()[1:]))]
+                print("Series body absolute is ")
+                print(seriesBody)
+                # seriesBody = ["0000"] + Rest of the calculated data
+                # print(seriesBody)
+                # seriesBody = spaceAdjustFictMeterBody(seriesBody)
+                returnSeries = returnSeries.append(pd.Series(" ".join(seriesBody)), ignore_index=True)
+                
+                i+=1
+
+            return returnSeries
+
+        if(isinstance(valueToAppend, float)):
+            return abs(valueToAppend)
+
 
     def ffOperation(a,b,op) :  # Both operands are float
         if op == '+': return float(a) + float(b)
@@ -343,7 +390,8 @@ def changeMeterEndDataWithEquation(path,startDate,endDate,meterEndToReplace,equa
 
     # Function that returns value of expression after evaluation.
     def evaluate(_fictMeterId,_mwhDate,tokens):
-
+        
+        print("Evaluating expression for " + tokens)
         # stack to store integer values.
         values = []
 
@@ -369,7 +417,35 @@ def changeMeterEndDataWithEquation(path,startDate,endDate,meterEndToReplace,equa
 
             # Current token is a meter ID, push 
             # it to stack for numbers.
-            elif tokens[i].isalpha() :
+
+            elif tokens[i].isalpha() and tokens[i : i + 4].upper() == 'ABS(' :
+                print("I got absolute")
+                idx = getCorrespondingClosingIdx(tokens[i+4: ], i+4)
+
+                #  We want to calculate the expression tokens[i+1 to idx - 1]
+                print("Closing Index is " + str(idx))
+
+                newExp = tokens[i+4: idx]
+
+                print(newExp)
+                if(newExp[0] == '+' or newExp[0] == '-'):
+                    newExp = '0' + newExp
+
+                newExpValue = evaluate(_fictMeterId,_mwhDate,newExp)
+
+                newExpValueAbsolute = takeAbsolute(_fictMeterId,_mwhDate,newExpValue)
+
+                print(" Return value is ")
+                print(newExpValueAbsolute)
+
+                values.append(newExpValueAbsolute)
+
+                # Finally we need to move i to idx + 1.
+                i = idx # +1 will be done at last by default.
+
+            # Current token is a meter ID, push 
+            # it to stack for numbers.
+            elif tokens[i].isalpha() and tokens[i : i + 4].upper() != 'ABS(':
                 val = tokens[i : i+5].replace("_","-")
 
                 if(os.path.exists(realMeterMWHPath + _mwhDate + "/" + searchMeterNumber(val) + '.MWH')) :
@@ -788,6 +864,41 @@ def changeMeterEndActiveReactiveDataWithEquation(path,startDate,endDate,meterEnd
 
     ################################################ Evaluate Function ###########################################################################
 
+    def takeAbsolute(_fictMeterId,_mwhDate,valueToAppend) :
+        print(type(valueToAppend))
+        if(isinstance(valueToAppend, pd.core.series.Series)):
+            print("Reached at takeAbsolute if. Need to take absolute of Series data")
+
+            meterNumber = 'ZZZ-ZZZ-ZZZ'
+
+            if((getMeterInfoById(_fictMeterId) is not None) and (getMeterInfoById(_fictMeterId).get('Meter_No') is not None)):
+                meterNumber = getMeterInfoById(_fictMeterId).get('Meter_No')
+
+            if((getFictMeterInfoById(_fictMeterId) is not None) and (getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No') is not None)):
+                meterNumber = getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No')
+
+            returnSeries = pd.Series([],dtype=object)
+            seriesHeader = [_fictMeterId, meterNumber,_mwhDate] +  [str(e) for e in list(map(lambda x: abs(float(x)), valueToAppend[0].split()[3:]))]
+            returnSeries = returnSeries.append(pd.Series(" ".join(seriesHeader)), ignore_index=True)
+
+            i = 1
+            while i < 25 :
+                seriesBody = [valueToAppend[i].split()[0]] +  [str(e) for e in list(map(lambda x: abs(float(x)), valueToAppend[i].split()[1:]))]
+                print("Series body absolute is ")
+                print(seriesBody)
+                # seriesBody = ["0000"] + Rest of the calculated data
+                # print(seriesBody)
+                # seriesBody = spaceAdjustFictMeterBody(seriesBody)
+                returnSeries = returnSeries.append(pd.Series(" ".join(seriesBody)), ignore_index=True)
+                
+                i+=1
+
+            return returnSeries
+
+        if(isinstance(valueToAppend, float)):
+            return abs(valueToAppend)
+
+
     def ffOperation(a,b,op) :  # Both operands are float
         if op == '+': return float(a) + float(b)
         if op == '-': return float(a) - float(b)
@@ -805,12 +916,12 @@ def changeMeterEndActiveReactiveDataWithEquation(path,startDate,endDate,meterEnd
         meterNumber = 'ZZZ-ZZZ-ZZZ'
 
         if((getMeterInfoById(_fictMeterId) is not None) and (getMeterInfoById(_fictMeterId).get('Meter_No') is not None)):
-            meterNumer = getMeterInfoById(_fictMeterId).get('Meter_No')
+            meterNumber = getMeterInfoById(_fictMeterId).get('Meter_No')
 
         if((getFictMeterInfoById(_fictMeterId) is not None) and (getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No') is not None)):
-            meterNumer = getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No')
+            meterNumber = getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No')
 
-        seriesHeader = [_fictMeterId, meterNumer, _mwhDate] +  [str(e) for e in list(map(lambda x,y: ffOperation(x,y,op), a[0].split()[3:], b[0].split()[3:]))]
+        seriesHeader = [_fictMeterId, meterNumber, _mwhDate] +  [str(e) for e in list(map(lambda x,y: ffOperation(x,y,op), a[0].split()[3:], b[0].split()[3:]))]
         #     print("sending")
         #     print(seriesHeader)
 
@@ -838,10 +949,10 @@ def changeMeterEndActiveReactiveDataWithEquation(path,startDate,endDate,meterEnd
         meterNumber = 'ZZZ-ZZZ-ZZZ'
 
         if((getMeterInfoById(_fictMeterId) is not None) and (getMeterInfoById(_fictMeterId).get('Meter_No') is not None)):
-            meterNumer = getMeterInfoById(_fictMeterId).get('Meter_No')
+            meterNumber = getMeterInfoById(_fictMeterId).get('Meter_No')
 
         if((getFictMeterInfoById(_fictMeterId) is not None) and (getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No') is not None)):
-            meterNumer = getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No')
+            meterNumber = getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No')
 
         seriesHeader = [_fictMeterId, meterNumber, _mwhDate] +  [str(e) for e in list(map(lambda y : ffOperation(a,y,op), b[0].split()[3:]))]
         # seriesHeader = spaceAdjustFictMeterHeader(seriesHeader)
@@ -868,10 +979,10 @@ def changeMeterEndActiveReactiveDataWithEquation(path,startDate,endDate,meterEnd
         meterNumber = 'ZZZ-ZZZ-ZZZ'
 
         if((getMeterInfoById(_fictMeterId) is not None) and (getMeterInfoById(_fictMeterId).get('Meter_No') is not None)):
-            meterNumer = getMeterInfoById(_fictMeterId).get('Meter_No')
+            meterNumber = getMeterInfoById(_fictMeterId).get('Meter_No')
 
         if((getFictMeterInfoById(_fictMeterId) is not None) and (getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No') is not None)):
-            meterNumer = getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No')
+            meterNumber = getFictMeterInfoById(_fictMeterId).get('Fict_Meter_No')
 
 
         seriesHeader = [_fictMeterId, meterNumber, _mwhDate] +  [str(e) for e in list(map(lambda x : ffOperation(x,b,op), a[0].split()[3:]))]
@@ -957,9 +1068,34 @@ def changeMeterEndActiveReactiveDataWithEquation(path,startDate,endDate,meterEnd
             # Current token is a number, push 
             # it to stack for numbers.
 
+            elif tokens[i].isalpha() and tokens[i : i + 4].upper() == 'ABS(' :
+                print("I got absolute")
+                idx = getCorrespondingClosingIdx(tokens[i+4: ], i+4)
+                print("Closing Index is " + str(idx))
+                #  We want to calculate the expression tokens[i+1 to idx - 1]
+
+                newExp = tokens[i+4: idx]
+
+                print(newExp)
+                if(newExp[0] == '+' or newExp[0] == '-'):
+                    newExp = '0' + newExp
+
+                newExpValue = evaluate(_fictMeterId,_mwhDate,newExp,dataToChange)
+
+                newExpValueAbsolute = takeAbsolute(_fictMeterId,_mwhDate,newExpValue)
+
+                print(" Return value is ")
+                print(newExpValueAbsolute)
+
+                values.append(newExpValueAbsolute)
+
+                # Finally we need to move i to idx + 1.
+                i = idx # +1 will be done at last by default.
+
+
             # Current token is a meter ID, push 
             # it to stack for numbers.
-            elif tokens[i].isalpha() :
+            elif tokens[i].isalpha() and tokens[i : i + 4].upper() != 'ABS(' :
                 val = tokens[i : i+5].replace("_","-")
 
                 if(os.path.exists(realMeterMWHPath + _mwhDate + "/" + searchMeterNumber(val) + '.MWH')) :
@@ -1160,9 +1296,9 @@ def changeMeterEndActiveReactiveDataWithEquation(path,startDate,endDate,meterEnd
             meterId = searchMeterId(meterNumber)
             print("(" + meterId + " : " + meterNumber + ") not found, while calculating equation" + eq)
             return {'errorCode' : 2 , 'msg' : "File unavailability for date " + dateObject.strftime("%d-%m-%y")}
-        except :
-            print("Got error for " + eq)
-            return {'errorCode' : 3 , 'msg' : "Error in equation"}
+        # except :
+        #     print("Got error for " + eq)
+        #     return {'errorCode' : 3 , 'msg' : "Error in equation"}
 
         print(df2)
 

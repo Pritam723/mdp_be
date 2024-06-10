@@ -9,6 +9,26 @@ from datetime import time,timedelta,datetime
 import math
 from .finalOutputExcel import createFinalOutputExcel
 
+
+
+# Added for Absolute Calculation
+def getCorrespondingClosingIdx(tokens, t):
+#     print(tokens)
+    count = 1
+    
+    for token in tokens:
+        if(token == '('):
+            count = count + 1
+        elif(token == ')'):
+            count = count - 1
+            if(count == 0): return t
+        else:
+            pass
+    
+        t = t + 1
+    
+    return t
+
 # decideSpace(16,_part[i])
 
 # Fixing the gaps between the headers
@@ -241,6 +261,32 @@ def createFinalOutput(path,_meterData):
 
     ################################################### Evalutate Function #################################################################
 
+    def takeAbsolute(_fictMeterId,_mwhDate,valueToAppend) :
+        print(type(valueToAppend))
+        if(isinstance(valueToAppend, pd.core.series.Series)):
+            print("Reached at takeAbsolute if. Need to take absolute of Series data")
+
+            returnSeries = pd.Series([],dtype=object)
+            seriesHeader = [_fictMeterId, 'ZZZ-ZZZ-ZZZ',_mwhDate] +  [str(e) for e in list(map(lambda x: abs(float(x)), valueToAppend[0].split()[3:]))]
+            returnSeries = returnSeries.append(pd.Series(" ".join(seriesHeader)), ignore_index=True)
+
+            i = 1
+            while i < 25 :
+                seriesBody = [valueToAppend[i].split()[0]] +  [str(e) for e in list(map(lambda x: abs(float(x)), valueToAppend[i].split()[1:]))]
+                print("Series body absolute is ")
+                print(seriesBody)
+                # seriesBody = ["0000"] + Rest of the calculated data
+                # print(seriesBody)
+                # seriesBody = spaceAdjustFictMeterBody(seriesBody)
+                returnSeries = returnSeries.append(pd.Series(" ".join(seriesBody)), ignore_index=True)
+                
+                i+=1
+
+            return returnSeries
+
+        if(isinstance(valueToAppend, float)):
+            return abs(valueToAppend)
+
     def ffOperation(a,b,op) :  # Both operands are float
         if op == '+': return float(a) + float(b)
         if op == '-': return float(a) - float(b)
@@ -387,9 +433,36 @@ def createFinalOutput(path,_meterData):
             # Current token is a number, push 
             # it to stack for numbers.
 
+
+            elif tokens[i].isalpha() and tokens[i : i + 4].upper() == 'ABS(' :
+                print("I got absolute")
+                idx = getCorrespondingClosingIdx(tokens[i+4: ], i+4)
+
+                #  We want to calculate the expression tokens[i+1 to idx - 1]
+
+                newExp = tokens[i+4: idx]
+
+                print(newExp)
+                if(newExp[0] == '+' or newExp[0] == '-'):
+                    newExp = '0' + newExp
+
+                newExpValue = evaluate(_fictMeterId,_mwhDate,newExp)
+
+                newExpValueAbsolute = takeAbsolute(_fictMeterId,_mwhDate,newExpValue)
+
+                print(" Return value is ")
+                print(newExpValueAbsolute)
+
+                values.append(newExpValueAbsolute)
+
+                # Finally we need to move i to idx + 1.
+                i = idx # +1 will be done at last by default.
+
+
+
             # Current token is a meter ID, push 
             # it to stack for numbers.
-            elif tokens[i].isalpha() :
+            elif tokens[i].isalpha() and tokens[i : i + 4].upper() != 'ABS(':
                 val = tokens[i : i+5].replace("_","-")
                 # data = pd.read_csv('mySEMBASE/'+ _mwhDate + "/" + searchMeterNumber(val) + '.MWH', header = None)
                 if(os.path.exists(realMeterMWHPath + _mwhDate + "/" + searchMeterNumber(val) + '.MWH')) :

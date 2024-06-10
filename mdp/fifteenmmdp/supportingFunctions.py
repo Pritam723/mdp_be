@@ -2,6 +2,7 @@ import os
 from django.core.files import File
 import re
 from datetime import datetime,timedelta
+import pandas as pd
 # import plotly.graph_objects as go
 # import numpy as np
 
@@ -274,6 +275,8 @@ def weekHeaderCheck(rowList) :
 def decideSpace(spaceValue,stringToCheck) :
     spaceOffset = max(spaceValue,len(stringToCheck)+1)
     return spaceOffset - len(stringToCheck)
+
+
 
 #############################################################################################################################################
 
