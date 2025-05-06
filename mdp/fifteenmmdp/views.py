@@ -1455,6 +1455,7 @@ def pushWeeklyMeterDataToArchive(request, meter_id):
             pushMeterDataToArchive(path = "meterFile" + meter_id, datesToConsider = datesToConsider)
             return HttpResponse({'message': 'Data Pushed to Archival '}, status=200)
         except Exception as e:
+            print(e)
             return HttpResponse(json.dumps([str(e)]), content_type='application/json',status=500)
     else :
         print('Data can only be pushed after Fictitious Meter Calculation is Done')

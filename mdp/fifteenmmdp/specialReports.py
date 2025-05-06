@@ -156,7 +156,7 @@ def specialReport1(path,meter_id,threshold):
 
 ##############################################################################################################################################
 
-    graphData = fetchData(meter_id,_end1="RN-95",_end2="RN-96",polarity="def")
+    graphData = fetchData(meter_id,_end1="RN-95",_end2="RN-96",polarity="def",dataType="MWH Data")
     # return HttpResponse(json.dumps(graphData), content_type='application/json')
     _fullXAxisData = [datetime.strptime(x,"%d-%m-%y %H:%M") for x in graphData['xAxisData']]
     fullXAxisData = [datetime.strftime(x,"%Y-%m-%d %H:%M") for x in _fullXAxisData]
